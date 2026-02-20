@@ -7,3 +7,5 @@ class Config:
         f"@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'master_data_db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Set to True to log all SQL to the console (useful for debugging)
+    SQLALCHEMY_ECHO = os.getenv("SQLALCHEMY_ECHO", "false").lower() in ("1", "true", "yes")
