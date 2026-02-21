@@ -1,18 +1,23 @@
 from flask import Blueprint, request, jsonify
-from app.models import db, Category
-import uuid
+from flask_jwt_extended import jwt_required
+from app.services import CategoryService
 
 categories_bp = Blueprint("categories", __name__)
 
 
 @categories_bp.route("", methods=["GET"])
+@jwt_required()
 def list_categories():
     """
     List all categories
     ---
     tags:
       - Categories
+    security:
+      - Bearer: []
     responses:
+      401:
+        description: Missing or invalid JWT
       200:
         description: List of categories
         schema:
@@ -33,23 +38,20 @@ def list_categories():
                 type: string
                 enum: [active, inactive]
     """
-    categories = Category.query.order_by(Category.name).all()
-    return jsonify([{
-        "id": c.id,
-        "name": c.name,
-        "slug": c.slug,
-        "product_count": c.product_count,
-        "status": c.status,
-    } for c in categories])
+    categories = CategoryService.list_all()
+    return jsonify([CategoryService.to_dict(c, camel_case=True) for c in categories])
 
 
 @categories_bp.route("/<id>", methods=["GET"])
+@jwt_required()
 def get_category(id):
     """
     Get a category by ID
     ---
     tags:
       - Categories
+    security:
+      - Bearer: []
     parameters:
       - name: id
         in: path
@@ -82,25 +84,22 @@ def get_category(id):
               type: string
               example: Not found
     """
-    c = Category.query.get(id)
-    if not c:
+    category = CategoryService.get_by_id(id)
+    if not category:
         return jsonify({"error": "Not found"}), 404
-    return jsonify({
-        "id": c.id,
-        "name": c.name,
-        "slug": c.slug,
-        "product_count": c.product_count,
-        "status": c.status,
-    })
+    return jsonify(CategoryService.to_dict(category, camel_case=True))
 
 
 @categories_bp.route("", methods=["POST"])
+@jwt_required()
 def create_category():
     """
     Create a new category
     ---
     tags:
       - Categories
+    security:
+      - Bearer: []
     parameters:
       - name: body
         in: body
@@ -137,18 +136,9 @@ def create_category():
               type: string
     """
     data = request.get_json() or {}
-    cat = Category(
-        id=str(uuid.uuid4()),
+    category = CategoryService.create(
         name=data.get("name", ""),
-        slug=data.get("slug", "").lower().replace(" ", "-"),
+        slug=data.get("slug"),
         status=data.get("status", "active"),
     )
-    db.session.add(cat)
-    db.session.commit()
-    return jsonify({
-        "id": cat.id,
-        "name": cat.name,
-        "slug": cat.slug,
-        "product_count": cat.product_count,
-        "status": cat.status,
-    }), 201
+    return jsonify(CategoryService.to_dict(category, camel_case=True)), 201
