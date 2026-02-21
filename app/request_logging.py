@@ -4,6 +4,7 @@ Sensitive headers (e.g. Authorization) are masked.
 """
 
 import logging
+import uuid
 from flask import request, g
 
 
@@ -34,14 +35,25 @@ def _mask_headers(headers: dict) -> dict:
     return out
 
 
+class RequestIdFilter(logging.Filter):
+    """Add request_id from Flask g to log records."""
+
+    def filter(self, record):
+        record.request_id = getattr(g, "request_id", None) or "-"
+        return True
+
+
 def init_request_logging(app):
-    """Register before_request and after_request to log request params, body and response body."""
+    """Register request ID, before_request and after_request logging."""
     logger = logging.getLogger("app.request")
     logger.setLevel(getattr(logging, app.config.get("LOG_LEVEL", "INFO").upper(), logging.INFO))
     if not logger.handlers:
         handler = logging.StreamHandler()
+        handler.addFilter(RequestIdFilter())
         handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+            logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s"
+            )
         )
         logger.addHandler(handler)
 
@@ -49,8 +61,8 @@ def init_request_logging(app):
     res_max = app.config.get("LOG_RESPONSE_BODY_MAX_LENGTH", 2048)
 
     @app.before_request
-    def log_request():
-        # Ensure request body is cached so the view can still read it
+    def set_request_id_and_log():
+        g.request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         body = request.get_data(cache=True)
         query = dict(request.args) if request.args else None
         headers = _mask_headers(dict(request.headers))
@@ -62,10 +74,11 @@ def init_request_logging(app):
             headers,
             _safe_body(body, req_max),
         )
-        g._request_body_logged = True
 
     @app.after_request
-    def log_response(response):
+    def log_response_and_add_request_id(response):
+        if g.get("request_id"):
+            response.headers["X-Request-ID"] = g.request_id
         body = response.get_data()
         response_body = _safe_body(body, res_max)
         logger.info(

@@ -1,12 +1,12 @@
 # Repository layer
 
-Repositories encapsulate all **data access** for an entity. They talk to the database (via SQLAlchemy models) and return model instances. No business logic here—only queries and persistence.
+Repositories encapsulate all **data access** for an entity. They use **instance methods** (no `@staticmethod`) and talk to the database via SQLAlchemy models. No business logic—only queries and persistence.
 
 **Flow:** Routes → Services → Repositories → Models (DB)
 
-- **Routes**: HTTP, validation, response shape.
-- **Services**: Business logic, orchestration, serialization (e.g. `to_dict`).
-- **Repositories**: `find_all()`, `find_by_id()`, `add()`, `create()`, etc. No `db` or `Model.query` in services.
+- **Routes**: Import services from `app.container`, call instance methods.
+- **Services**: Take a repository in `__init__` (dependency injection); business logic and serialization.
+- **Repositories**: Instance methods like `find_all()`, `find_by_id()`, `create()`. No `db` or `Model.query` in services.
 
 ## Adding a new entity
 

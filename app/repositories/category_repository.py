@@ -7,22 +7,24 @@ from app.models import db, Category
 class CategoryRepository:
     """Repository for Category entity. Handles all persistence for categories."""
 
-    @staticmethod
-    def find_all():
-        return Category.query.order_by(Category.name).all()
+    def find_all(self, page=None, per_page=None):
+        q = Category.query.order_by(Category.name)
+        if page is not None and per_page is not None:
+            return q.paginate(page=page, per_page=per_page, error_out=False)
+        return q.all()
 
-    @staticmethod
-    def find_by_id(id_):
-        return Category.query.get(id_)
+    def find_by_id(self, id_):
+        return db.session.get(Category, id_)
 
-    @staticmethod
-    def add(category):
+    def count(self):
+        return Category.query.count()
+
+    def add(self, category):
         db.session.add(category)
         db.session.commit()
         return category
 
-    @staticmethod
-    def create(id_=None, name="", slug="", status="active"):
+    def create(self, id_=None, name="", slug="", status="active"):
         category = Category(
             id=id_ or str(uuid.uuid4()),
             name=name,

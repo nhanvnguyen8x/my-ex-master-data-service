@@ -1,6 +1,6 @@
 # Adding a new API (route group)
 
-Layers: **Routes → Services → Repositories → Models**. Add from the bottom up.
+Layers: **Routes → Services → Repositories → Models**. Add from the bottom up. Routes get services from **`app.container`** (e.g. `from app.container import category_service`).
 
 1. **Model** in `app/models.py`, then migration.
 2. **Repository** in `app/repositories/<entity>_repository.py` (data access only). See `app/repositories/README.md`.

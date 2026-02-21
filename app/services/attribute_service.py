@@ -6,12 +6,16 @@ from app.repositories import AttributeRepository
 class AttributeService:
     """Application service for attributes. Orchestrates repository and serialization."""
 
-    @staticmethod
-    def list_all():
-        return AttributeRepository.find_all()
+    def __init__(self, attribute_repository: AttributeRepository):
+        self.attribute_repository = attribute_repository
 
-    @staticmethod
-    def to_dict(attr):
+    def list_all(self, page=None, per_page=None):
+        result = self.attribute_repository.find_all(page=page, per_page=per_page)
+        if hasattr(result, "items"):
+            return result.items, result.total
+        return result, len(result)
+
+    def to_dict(self, attr):
         if not attr:
             return None
         return {

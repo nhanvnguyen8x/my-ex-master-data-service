@@ -6,21 +6,23 @@ from app.repositories import CategoryRepository
 class CategoryService:
     """Application service for categories. Orchestrates repository and serialization."""
 
-    @staticmethod
-    def list_all():
-        return CategoryRepository.find_all()
+    def __init__(self, category_repository: CategoryRepository):
+        self.category_repository = category_repository
 
-    @staticmethod
-    def get_by_id(id_):
-        return CategoryRepository.find_by_id(id_)
+    def list_all(self, page=None, per_page=None):
+        result = self.category_repository.find_all(page=page, per_page=per_page)
+        if hasattr(result, "items"):
+            return result.items, result.total
+        return result, len(result)
 
-    @staticmethod
-    def create(name, slug=None, status="active"):
+    def get_by_id(self, id_):
+        return self.category_repository.find_by_id(id_)
+
+    def create(self, name, slug=None, status="active"):
         slug = (slug or name or "").lower().replace(" ", "-")
-        return CategoryRepository.create(name=name or "", slug=slug, status=status)
+        return self.category_repository.create(name=name or "", slug=slug, status=status)
 
-    @staticmethod
-    def to_dict(category, camel_case=False):
+    def to_dict(self, category, camel_case=False):
         if not category:
             return None
         data = {

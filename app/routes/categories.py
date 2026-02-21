@@ -1,45 +1,50 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
-from app.services import CategoryService
+from marshmallow import ValidationError as MarshmallowValidationError
+from app.container import category_service
+from app.schemas import CreateCategorySchema
 
 categories_bp = Blueprint("categories", __name__)
+create_category_schema = CreateCategorySchema()
+
+
+def _parse_pagination():
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = min(100, max(1, int(request.args.get("per_page", 20))))
+    return page, per_page
 
 
 @categories_bp.route("", methods=["GET"])
 @jwt_required()
 def list_categories():
     """
-    List all categories
+    List all categories (paginated)
     ---
     tags:
       - Categories
     security:
       - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
     responses:
       401:
         description: Missing or invalid JWT
       200:
-        description: List of categories
-        schema:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-              name:
-                type: string
-              slug:
-                type: string
-              product_count:
-                type: integer
-              status:
-                type: string
-                enum: [active, inactive]
+        description: List of categories with pagination meta
     """
-    categories = CategoryService.list_all()
-    return jsonify([CategoryService.to_dict(c, camel_case=True) for c in categories])
+    page, per_page = _parse_pagination()
+    items, total = category_service.list_all(page=page, per_page=per_page)
+    return jsonify({
+        "data": [category_service.to_dict(c, camel_case=True) for c in items],
+        "meta": {"page": page, "per_page": per_page, "total": total},
+    })
 
 
 @categories_bp.route("/<id>", methods=["GET"])
@@ -84,10 +89,10 @@ def get_category(id):
               type: string
               example: Not found
     """
-    category = CategoryService.get_by_id(id)
+    category = category_service.get_by_id(id)
     if not category:
         return jsonify({"error": "Not found"}), 404
-    return jsonify(CategoryService.to_dict(category, camel_case=True))
+    return jsonify(category_service.to_dict(category, camel_case=True))
 
 
 @categories_bp.route("", methods=["POST"])
@@ -135,10 +140,14 @@ def create_category():
             status:
               type: string
     """
-    data = request.get_json() or {}
-    category = CategoryService.create(
-        name=data.get("name", ""),
+    raw = request.get_json() or {}
+    try:
+        data = create_category_schema.load(raw)
+    except MarshmallowValidationError as e:
+        return jsonify({"error": "Validation failed", "code": "VALIDATION_ERROR", "details": e.messages}), 400
+    category = category_service.create(
+        name=data["name"],
         slug=data.get("slug"),
         status=data.get("status", "active"),
     )
-    return jsonify(CategoryService.to_dict(category, camel_case=True)), 201
+    return jsonify(category_service.to_dict(category, camel_case=True)), 201

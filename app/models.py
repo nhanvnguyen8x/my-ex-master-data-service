@@ -1,5 +1,9 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utc_now():
+    return datetime.now(timezone.utc)
 
 
 class Category(db.Model):
@@ -9,7 +13,7 @@ class Category(db.Model):
     slug = db.Column(db.String(255), unique=True, index=True)
     product_count = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default="active")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
 
 
 class Tag(db.Model):
@@ -19,7 +23,7 @@ class Tag(db.Model):
     code = db.Column(db.String(100), nullable=True, index=True)
     status = db.Column(db.String(20), default="active")
     usage_count = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
 
 
 class Attribute(db.Model):
@@ -29,4 +33,4 @@ class Attribute(db.Model):
     code = db.Column(db.String(100), nullable=True, index=True)
     status = db.Column(db.String(20), default="active")
     usage_count = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)

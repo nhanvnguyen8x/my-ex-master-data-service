@@ -27,3 +27,20 @@ class Config:
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
     LOG_REQUEST_BODY_MAX_LENGTH = int(os.getenv("LOG_REQUEST_BODY_MAX_LENGTH", "2048"))
     LOG_RESPONSE_BODY_MAX_LENGTH = int(os.getenv("LOG_RESPONSE_BODY_MAX_LENGTH", "2048"))
+
+    # CORS: comma-separated origins, or * for allow all (dev only)
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+
+    # Rate limit: default "200 per minute" per IP (exempt: health, ready)
+    RATELIMIT_DEFAULT = os.getenv("RATELIMIT_DEFAULT", "200 per minute")
+
+
+class TestConfig(Config):
+    """Config for unit tests: in-memory SQLite, no migrations."""
+
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    TESTING = True
+    JWT_SECRET_KEY = "test-secret"
+    SKIP_MIGRATIONS = True
+    CORS_ORIGINS = "*"
+    RATELIMIT_DEFAULT = "1000 per minute"

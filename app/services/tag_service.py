@@ -6,12 +6,16 @@ from app.repositories import TagRepository
 class TagService:
     """Application service for tags. Orchestrates repository and serialization."""
 
-    @staticmethod
-    def list_all():
-        return TagRepository.find_all()
+    def __init__(self, tag_repository: TagRepository):
+        self.tag_repository = tag_repository
 
-    @staticmethod
-    def to_dict(tag):
+    def list_all(self, page=None, per_page=None):
+        result = self.tag_repository.find_all(page=page, per_page=per_page)
+        if hasattr(result, "items"):
+            return result.items, result.total
+        return result, len(result)
+
+    def to_dict(self, tag):
         if not tag:
             return None
         return {

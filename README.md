@@ -14,12 +14,13 @@ Master Data microservice for Experience Review platform. **Python + Flask.**
 
 All APIs are versioned under `/api/v1` (configurable via `API_V1_PREFIX`):
 
-- `GET /api/v1/health` — health check **(no auth)**
-- `GET /api/v1/categories` — list categories **(JWT required)** (camelCase: `productCount`)
+- `GET /api/v1/health` — liveness **(no auth)**
+- `GET /api/v1/health/ready` — readiness (DB check; 503 if DB down) **(no auth)**
+- `GET /api/v1/categories` — list categories, paginated **(JWT required)** (`?page=1&per_page=20`; response: `{ data, meta }`, camelCase `productCount`)
 - `GET /api/v1/categories/<id>` — get category **(JWT required)**
 - `POST /api/v1/categories` — create category **(JWT required)** (body: `name`, `slug`, `status`)
-- `GET /api/v1/tags` — list tags **(JWT required)** (for my-ex-admin Master Data)
-- `GET /api/v1/attributes` — list attributes **(JWT required)** (for my-ex-admin Master Data)
+- `GET /api/v1/tags` — list tags, paginated **(JWT required)** (`?page=1&per_page=20`; response: `{ data, meta }`)
+- `GET /api/v1/attributes` — list attributes, paginated **(JWT required)** (response: `{ data, meta }`)
 
 ### Swagger UI
 
@@ -37,7 +38,7 @@ The **my-ex-admin** web app uses this service for Master Data (categories, tags,
 VITE_MASTER_DATA_API_URL=http://localhost:3004/api/v1
 ```
 
-Then the admin will call `GET /categories`, `GET /tags`, and `GET /attributes` (relative to that base). All three return JSON arrays; categories use camelCase (`productCount`), tags and attributes use `usageCount`.
+Then the admin will call `GET /categories`, `GET /tags`, and `GET /attributes` (relative to that base). Responses are `{ data: [...], meta: { page, per_page, total } }`; use `response.data` for the array. Categories use camelCase (`productCount`), tags and attributes use `usageCount`.
 
 ## Migrations
 
@@ -76,6 +77,32 @@ kubectl apply -f k8s/
 # Then: kubectl apply -f k8s/deployment.yaml k8s/service.yaml
 ```
 
+## Tests
+
+Unit tests cover the **repository** and **service** layers. Repository tests use an in-memory SQLite DB; service tests use fake repositories (no database).
+
+**Run all unit tests:**
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+**Run with coverage:**
+
+```bash
+pytest --cov=app --cov-report=term-missing
+```
+
+**Run only repository or service tests:**
+
+```bash
+pytest tests/unit/repositories/
+pytest tests/unit/services/
+```
+
+Tests are in `tests/unit/repositories/` and `tests/unit/services/`. Configuration: `pytest.ini`, `tests/conftest.py` (app fixture with `TestConfig` and SQLite).
+
 ## Adding new APIs
 
 1. Add a new module under `app/routes/` (e.g. `subcategories.py`) with a Blueprint and route handlers.
@@ -83,6 +110,16 @@ kubectl apply -f k8s/
 3. Optionally add business logic in `app/services/` and keep routes thin.
 
 See `app/routes/README.md` for details.
+
+## Behaviour and hardening
+
+- **Error handling:** 404/500 and unhandled exceptions return JSON `{ "error", "code", "request_id" }`; no stack traces in production.
+- **Request ID:** Every request gets an `X-Request-ID` (or uses the client-provided one); it is logged and included in error responses.
+- **Production guard:** If `ENV=production` (or `FLASK_ENV=production`) and `JWT_SECRET_KEY` or `SECRET_KEY` is still the default, the app raises at startup. Set real secrets before using production.
+- **Validation:** `POST /categories` body is validated with Marshmallow; invalid input returns 400 with `{ "error", "code": "VALIDATION_ERROR", "details" }`.
+- **Pagination:** List endpoints accept `page` and `per_page` (defaults 1 and 20, `per_page` capped at 100) and return `{ data, meta }`.
+- **CORS:** Configurable via `CORS_ORIGINS` (comma-separated; default `*`).
+- **Rate limiting:** 200 requests per minute per IP by default; `/health` and `/health/ready` are exempt.
 
 ## JWT validation
 
@@ -111,3 +148,5 @@ Use the same **JWT_SECRET_KEY** (and algorithm) as the service that issues token
 | DB_USER                     | postgres | DB user                          |
 | DB_PASSWORD                 | postgres | DB password                      |
 | DB_NAME                     | master_data_db | Database name                 |
+| CORS_ORIGINS                | *              | Comma-separated CORS origins   |
+| RATELIMIT_DEFAULT           | 200 per minute | Default rate limit per IP     |
