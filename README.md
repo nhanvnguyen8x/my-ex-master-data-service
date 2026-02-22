@@ -62,6 +62,9 @@ export DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=postgres DB_N
 python wsgi.py
 ```
 
+- **`python wsgi.py`** uses port **3004** (from `PORT` env or default in code).
+- **`flask run`** uses Flask’s default port **5000** unless you set **`FLASK_RUN_PORT=3004`** or copy `.env.example` to `.env` (it sets `FLASK_RUN_PORT=3004`). Then the app will be at **http://127.0.0.1:3004**.
+
 ## Docker Compose
 
 ```bash

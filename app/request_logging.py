@@ -1,6 +1,5 @@
 """
-Request/response logging: logs request method, path, query params, body and response status, body.
-Sensitive headers (e.g. Authorization) are masked.
+Request/response logging: request params (method, path, query), body when present, response status; body on error; exceptions in error_handlers.
 """
 
 import logging
@@ -22,17 +21,6 @@ def _safe_body(data: bytes, max_length: int) -> str:
     except Exception:
         return "<binary or undecodable>"
     return _truncate(text, max_length)
-
-
-def _mask_headers(headers: dict) -> dict:
-    out = dict(headers)
-    if "Authorization" in out:
-        val = out["Authorization"]
-        if val and val.lower().startswith("bearer "):
-            out["Authorization"] = "Bearer ***"
-        else:
-            out["Authorization"] = "***"
-    return out
 
 
 class RequestIdFilter(logging.Filter):
@@ -64,28 +52,23 @@ def init_request_logging(app):
     def set_request_id_and_log():
         g.request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         body = request.get_data(cache=True)
-        query = dict(request.args) if request.args else None
-        headers = _mask_headers(dict(request.headers))
-        logger.info(
-            "Request: %s %s | query=%s | headers=%s | body=%s",
-            request.method,
-            request.path,
-            query,
-            headers,
-            _safe_body(body, req_max),
-        )
+        body_str = _safe_body(body, req_max)
+        parts = ["Request: %s %s" % (request.method, request.path)]
+        if request.query_string:
+            parts.append("query=%s" % request.query_string.decode("utf-8", errors="replace"))
+        if body_str:
+            parts.append("body=%s" % body_str)
+        logger.info(" | ".join(parts))
 
     @app.after_request
     def log_response_and_add_request_id(response):
         if g.get("request_id"):
             response.headers["X-Request-ID"] = g.request_id
-        body = response.get_data()
-        response_body = _safe_body(body, res_max)
-        logger.info(
-            "Response: %s %s | status=%s | body=%s",
-            request.method,
-            request.path,
-            response.status_code,
-            response_body,
-        )
+        parts = ["Response: %s %s | status=%s" % (request.method, request.path, response.status_code)]
+        if response.status_code >= 400:
+            body = response.get_data()
+            body_str = _safe_body(body, res_max)
+            if body_str:
+                parts.append("body=%s" % body_str)
+        logger.info(" | ".join(parts))
         return response

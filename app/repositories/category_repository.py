@@ -13,7 +13,7 @@ class CategoryRepository:
             return q.paginate(page=page, per_page=per_page, error_out=False)
         return q.all()
 
-    def find_by_id(self, id_):
+    def find_by_id(self, id_) -> Category:
         return db.session.get(Category, id_)
 
     def count(self):

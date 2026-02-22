@@ -10,10 +10,16 @@ from app.config import Config
 
 def _rate_limit_key():
     from flask import request
-    p = request.path.rstrip("/")
-    if p.endswith("health") or p.endswith("ready"):
-        return None  # no rate limit for health/ready
-    return get_remote_address()
+    path = request.path
+    # Exempt: health, readiness, Swagger UI and OpenAPI spec (so docs are always reachable)
+    if path.rstrip("/").endswith("health") or path.rstrip("/").endswith("ready"):
+        return None
+    if "/apidocs" in path or "apispec" in path:
+        return None
+    try:
+        return get_remote_address()
+    except Exception:
+        return "unknown"
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -60,6 +66,13 @@ def create_app(config=None):
 
     limiter.init_app(app)
     base_path = app.config.get("API_V1_PREFIX", "/api/v1")
+    # Use CDN for Swagger UI so SwaggerUIBundle loads reliably (Flasgger's bundled JS can fail in browser)
+    app.config.setdefault("SWAGGER", {}).update({
+        "swagger_ui_bundle_js": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.52.5/swagger-ui-bundle.js",
+        "swagger_ui_standalone_preset_js": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.52.5/swagger-ui-standalone-preset.js",
+        "swagger_ui_css": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.52.5/swagger-ui.css",
+        "jquery_js": "https://code.jquery.com/jquery-3.7.1.min.js",
+    })
     Swagger(app, template=_swagger_template(base_path))
 
     with app.app_context():
